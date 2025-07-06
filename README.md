@@ -3,7 +3,7 @@
 ## The Heather section consists of blocks of 24 bytes, where there are names and meta. They end in address AA0
 
 - First 2 blocks: 17-byte filename + 1-byte padding + 6-byte meta
-- 12th block (index 11): 16-byte filename + 2-byte padding + 6-byte meta
+- 12th block : 16-byte filename + 2-byte padding + 6-byte meta
 - All other blocks: 14-byte filename + 4-byte padding + 6-byte meta
 
 ## Read the metadata:
