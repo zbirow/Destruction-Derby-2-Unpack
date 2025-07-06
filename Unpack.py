@@ -1,155 +1,63 @@
 import os
 import struct
+from pathlib import Path
 
-# ==========================================================
-# SET YOUR CONFIGURATION HERE
-# ==========================================================
-
-# 1. Path to the archive file you want to unpack.
-#    Examples:
-#    - Windows: "C:\\Games\\MyGame\\LEVEL1.DAT"
-#    - Linux/macOS: "/home/user/games/LEVEL1.DAT"
-#    - If the file is in the same folder as the script: "LEVEL1.DAT"
-ARCHIVE_FILE_PATH = "YOUR_FILE.DAT"  # <--- CHANGE THIS!
-
-# 2. Name of the folder where the files will be extracted.
-#    The folder will be created in the same location where you run the script.
-OUTPUT_DIRECTORY = "unpacked_files"  # <--- CHANGE THIS!
-
-# ==========================================================
-# FILE FORMAT CONFIGURATION (do not change unless you know what you're doing)
-# ==========================================================
-SECTOR_SIZE = 2048
-TOC_END_OFFSET = 0xAA0
-# ==========================================================
-
-def parse_toc(toc_data):
-    """Parses the Table of Contents data block and returns a list of files to extract."""
-    files_to_extract = []
-    cursor = 0
+def extract_blocks(input_file):
+    script_dir = Path(__file__).parent.absolute()
+    output_dir = script_dir / 'extracted'
+    output_dir.mkdir(exist_ok=True)
     
-    print(f"[*] Parsing Table of Contents (up to offset 0x{TOC_END_OFFSET:X})...")
+    with open(input_file, 'rb') as f:
+        block_count = 0
+        while f.tell() < 0xAA0:
+            block = f.read(24)
+            if len(block) < 24:
+                break
 
-    while cursor < len(toc_data):
-        try:
-            null_pos = toc_data.index(b'\x00', cursor)
-        except ValueError:
-            # No more null terminators found, end of ToC
-            break
+            if block_count < 2:
+                name_length = 17
+                padding_size = 1
+            elif block_count == 11:
+                name_length = 16
+                padding_size = 2
+            else:
+                name_length = 14
+                padding_size = 4
 
-        filename_bytes = toc_data[cursor:null_pos]
-        
-        if not filename_bytes:
-            # This is likely padding, skip it
-            cursor += 1
-            continue
+            name_bytes = bytearray()
+            for i in range(name_length):
+                if block[i] == 0:
+                    break
+                name_bytes.append(block[i])
+            name = name_bytes.decode('ascii', errors='replace')
 
-        # Decode filename and handle path separators for the current OS
-        filename = filename_bytes.decode('ascii', errors='ignore').replace('\\', os.path.sep)
-        
-        # Move cursor past the filename and its null terminator
-        cursor = null_pos + 1
+            index_pos = name_length + padding_size
+            size_pos = index_pos + 2
 
-        # Skip any subsequent padding bytes (0x00)
-        while cursor < len(toc_data) and toc_data[cursor] == 0:
-            cursor += 1
+            index = struct.unpack('<H', block[index_pos:index_pos+2])[0]
+            size = struct.unpack('<I', block[size_pos:size_pos+4])[0]
+            data_offset = index * 2048
 
-        # Check if there's enough room left for metadata
-        if cursor + 6 > len(toc_data):
-            break
-            
-        # The next 6 bytes are the metadata: 2 bytes for index, 4 for size
-        meta_bytes = toc_data[cursor:cursor+6]
-        
-        # Unpack metadata (Little-Endian format)
-        # '<' = Little-Endian
-        # 'H' = Unsigned Short (2 bytes) - for the index
-        # 'I' = Unsigned Int (4 bytes) - for the size
-        sector_index, file_size = struct.unpack('<HI', meta_bytes)
-        
-        if file_size > 0:
-            files_to_extract.append({
-                "name": filename,
-                "index": sector_index,
-                "size": file_size
-            })
-        
-        # Move cursor past the metadata
-        cursor += 6
+            if index > 0 and size > 0:
+                current_pos = f.tell()
+                f.seek(data_offset)
+                data = f.read(size)
+                f.seek(current_pos)
 
-    print(f"[+] Found {len(files_to_extract)} files to unpack.")
-    return files_to_extract
+                # Utwórz pełną ścieżkę docelową
+                output_path = output_dir / name
+                output_path.parent.mkdir(parents=True, exist_ok=True)
 
-def find_data_start(archive_data, search_start_offset):
-    """Finds the start of the data section by looking for the first non-zero byte."""
-    cursor = search_start_offset
-    while cursor < len(archive_data):
-        if archive_data[cursor] != 0:
-            print(f"[*] Data section start found at offset: 0x{cursor:X}")
-            return cursor
-        cursor += 1
-    return -1
+                with open(output_path, 'wb') as out:
+                    out.write(data)
 
-def main():
-    """Main function to perform the unpacking."""
-    
-    if not os.path.exists(ARCHIVE_FILE_PATH):
-        print(f"[!] Error: Archive file '{ARCHIVE_FILE_PATH}' does not exist.")
-        print("[!] Please make sure you have entered the correct path in the 'ARCHIVE_FILE_PATH' variable.")
-        return
+                print(f"Extracted: {name.ljust(30)} (block: {block_count:2d}, index: {index:5d}, size: {size:8d} bytes, offset: 0x{data_offset:06X})")
+            else:
+                print(f"Skipped:  {name.ljust(30)} (block: {block_count:2d}, invalid index or size)")
 
-    print(f"[*] Archive file: {ARCHIVE_FILE_PATH}")
-    print(f"[*] Output directory: {OUTPUT_DIRECTORY}")
+            block_count += 1
 
-    os.makedirs(OUTPUT_DIRECTORY, exist_ok=True)
-
-    try:
-        with open(ARCHIVE_FILE_PATH, 'rb') as f:
-            archive_data = f.read()
-
-            toc_data = archive_data[:TOC_END_OFFSET]
-            files_info = parse_toc(toc_data)
-
-            if not files_info:
-                print("[!] No files found in the Table of Contents. Aborting.")
-                return
-            
-            data_start_offset = find_data_start(archive_data, TOC_END_OFFSET)
-            if data_start_offset == -1:
-                print("[!] Could not find the start of the data section. The format might be incorrect.")
-                return
-
-            print("\n[*] Starting file extraction...")
-            for file_info in files_info:
-                name = file_info["name"]
-                index = file_info["index"]
-                size = file_info["size"]
-                
-                data_offset = data_start_offset + (index * SECTOR_SIZE)
-                
-                if data_offset + size > len(archive_data):
-                    print(f"[!] Error for file '{name}': Calculated offset ({data_offset}) and size ({size}) are out of bounds of the archive file!")
-                    continue
-                
-                file_data = archive_data[data_offset : data_offset + size]
-                
-                output_path = os.path.join(OUTPUT_DIRECTORY, name)
-                os.makedirs(os.path.dirname(output_path), exist_ok=True)
-                
-                try:
-                    with open(output_path, 'wb') as out_f:
-                        out_f.write(file_data)
-                    print(f"  -> Saved: {name} ({size} bytes)")
-                except IOError as e:
-                    print(f"[!] Error writing file '{name}': {e}")
-
-            print("\n[+] Done! All files have been extracted to the '{}' folder.".format(OUTPUT_DIRECTORY))
-
-    except IOError as e:
-        print(f"[!] Error reading archive file: {e}")
-    except Exception as e:
-        print(f"[!] An unexpected error occurred: {e}")
-
-# This line starts the script
 if __name__ == "__main__":
-    main()
+    input_file = 'C:/Users/zbirow/Downloads/destructionderby2_dirinfo/dirinfo.bin' # Replace with your input file path
+    extract_blocks(input_file)
+    print(f"Extraction complete! Files saved to: {Path(__file__).parent.absolute() / 'extracted'}")
