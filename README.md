@@ -1,4 +1,4 @@
-# Destruction-Derby-2-Unpack
+# Destruction Derby 2 Unpack | Dirinfo
 
 ## The Heather section consists of blocks of 24 bytes, where there are names and meta. They end in address AA0
 
