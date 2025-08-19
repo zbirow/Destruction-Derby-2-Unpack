@@ -65,6 +65,8 @@ To reconstruct the full address, you simply take the start part and place it in 
 1 + A075 = 1A075.
 That's all there is to it. The program reads these two small numbers and combines them to form the one, correct address.
 
+
+
 ## Data Block
 
 The first 8 bytes form the main RIFF chunk header:
@@ -72,6 +74,9 @@ The first 8 bytes form the main RIFF chunk header:
 Offset 0x00 (4 bytes): The "RIFF" signature. This tells the system it's a RIFF container file.
 
 Offset 0x04 (4 bytes): The size of the rest of the file. This number indicates how many bytes follow after this field.
+
+
+`52 49 46 46` `96 6C 00 00` `57 41 56 45 66 6D 74 *`
 
 | Offset | Size | Data Type | Value |
 | ------ | ---- | --------- | ----- |
