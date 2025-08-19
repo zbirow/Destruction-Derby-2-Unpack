@@ -138,7 +138,7 @@ class SBKPacker(tk.Tk):
                 file_size = len(wav_content)
                 data_block.extend(wav_content)
 
-                # --- CRITICAL FIX: Use 4-byte unsigned ints for all fields ---
+                # --- CRITICAL FIX: Use 4-byte unsigned ints ('I') for all fields ---
                 # The format string '<5I' means: Little-endian, 5 Unsigned Integers
                 entry_bytes = struct.pack('<5I',
                     current_absolute_offset, # Address (4 bytes)
@@ -149,7 +149,7 @@ class SBKPacker(tk.Tk):
                 )
                 index_entries_data.append(entry_bytes)
                 
-                self._log(f" - {os.path.basename(path)} -> Offset: 0x{current_absolute_offset:X}, Size: {file_size} B")
+                self._log(f" - {os.path.basename(path)} -> Offset: 0x{current_absolute_offset:X}, Size: {file_size} B, Duration Flag: {duration_flag}")
                 
                 current_absolute_offset += file_size
                 
