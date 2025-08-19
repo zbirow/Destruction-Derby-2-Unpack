@@ -7,7 +7,7 @@ from pathlib import Path
 class SBKUnpacker(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("SBK Sound Bank Unpacker")
+        self.title("SBK Sound Bank Unpacker (Index-Based)")
         self.geometry("750x500")
         self.resizable(False, False)
 
@@ -90,52 +90,54 @@ class SBKUnpacker(tk.Tk):
                 archive_data = f.read()
             
             archive_size = len(archive_data)
-            self._log(f"Read {archive_size / 1024:.2f} KB of data.")
+            self._log(f"Read {archive_size / 1024:.2f} KB of data. Parsing index...")
+
+            # --- CRITICAL FIX: Read the header and index table ---
+            header_data = archive_data[0:16]
+            if len(header_data) < 16:
+                raise ValueError("File is too small to contain a valid header.")
+            
+            file_count = struct.unpack('<H', header_data[12:14])[0]
+            self._log(f"Found {file_count} entries in the index.")
 
             os.makedirs(output_dir, exist_ok=True)
-            self._log(f"Files will be saved to the folder: '{output_dir}'")
             
+            index_start_offset = 16
+            index_entry_stride = 28 # 20 bytes data + 8 bytes padding
+            index_data_size = 20
             extracted_count = 0
-            current_pos = 0
-            RIFF_SIGNATURE = b'RIFF'
-            
-            while current_pos < archive_size:
-                riff_offset = archive_data.find(RIFF_SIGNATURE, current_pos)
-                if riff_offset == -1:
-                    break
 
-                size_field_offset = riff_offset + 4
+            for i in range(file_count):
+                entry_offset = index_start_offset + (i * index_entry_stride)
+                entry_data = archive_data[entry_offset : entry_offset + index_data_size]
+
+                # Unpack the entry using the correct 4-byte integer format
+                parts = struct.unpack('<5I', entry_data)
+                absolute_offset = parts[0]
+                block_size = parts[1]
                 
-                if size_field_offset + 4 > archive_size:
-                    self._log(f"Found a 'RIFF' at offset 0x{riff_offset:X}, but not enough data for a header. Stopping.")
-                    break
-                    
-                data_size = struct.unpack('<H', archive_data[size_field_offset : size_field_offset + 2])[0]
-                total_chunk_size = 8 + data_size
-
-                if riff_offset + total_chunk_size > archive_size:
-                    self._log(f"WARNING: Chunk at offset 0x{riff_offset:X} has a declared size ({data_size} bytes) that exceeds file boundaries. Skipping.")
-                    current_pos = riff_offset + 1
+                # Sanity checks
+                if block_size == 0:
+                    self._log(f" - Skipping entry #{i+1} (zero size).")
                     continue
+                if absolute_offset + block_size > archive_size:
+                    self._log(f" - ERROR: Entry #{i+1} points outside the file. Stopping.")
+                    messagebox.showwarning("Warning", f"Entry #{i+1} has invalid data (offset or size is out of bounds). Extraction may be incomplete.")
+                    break
 
-                wave_data = archive_data[riff_offset : riff_offset + total_chunk_size]
+                # Slice the exact file data using offset and size from the index
+                sound_data = archive_data[absolute_offset : absolute_offset + block_size]
                 
                 extracted_count += 1
                 output_filename = f"sound_{extracted_count:03d}.wav"
                 output_path = os.path.join(output_dir, output_filename)
 
                 with open(output_path, 'wb') as f_out:
-                    f_out.write(wave_data)
+                    f_out.write(sound_data)
 
-                self._log(f" -> Extracted '{output_filename}' (Data size: {data_size} bytes, Total size: {len(wave_data)} bytes)")
+                self._log(f" -> Extracted '{output_filename}' (Size: {block_size} B, Offset: 0x{absolute_offset:X})")
 
-                current_pos = riff_offset + total_chunk_size
-
-            if extracted_count == 0:
-                self._log("\nNo WAVE files were found or extracted.")
-            else:
-                self._log(f"\nDone! Extracted a total of {extracted_count} files.")
-            
+            self._log(f"\nDone! Extracted a total of {extracted_count} files.")
             messagebox.showinfo("Success", f"Extraction complete! {extracted_count} files were saved.")
 
         except FileNotFoundError:
