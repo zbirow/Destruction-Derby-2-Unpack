@@ -20,6 +20,8 @@
 | 0x0C - 0x0D | 2 bytes | ushort | The number of files contained in the archive. | 45 |
 | 0x0E - 0x0F | 2 bytes | - | 	Unused, padded with null bytes (0x00). | 0 |
 
+
+
 ## Index Table
 
 The Index Table begins immediately after the header, at offset 0x10 (16). It consists of a series of entries, where each entry describes a single sound file.
@@ -29,9 +31,14 @@ Total size of a single entry 'slot': 28 bytes.
 Slot Structure:
 
 20 bytes: Actual data describing the file.
-8 bytes: Empty padding.
-20-byte Entry Structure
+
+* 8 bytes: Empty padding.
+* 20-byte Entry Structure
+
 All multi-byte values are stored in Little Endian format.
+
+
+`FC 04` `00 00` `9E 6C` `00 00` `01 00` `00 00` `11 2B` `00 00` `01 00` `00 00`
 
 | Offset (Hex) | Size | Data Type | Description | Value |
 | ------------ | ---- | --------- | ----------- | ----- |
