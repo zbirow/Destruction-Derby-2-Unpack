@@ -8,7 +8,7 @@ class DD2Packer(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Destruction Derby 2 - DIRINFO Packer")
-        self.geometry("700x500")
+        self.geometry("750x500")
         self.resizable(False, False)
 
         self.input_dir_var = tk.StringVar()
@@ -20,25 +20,25 @@ class DD2Packer(tk.Tk):
         main_frame = ttk.Frame(self, padding="10")
         main_frame.pack(fill="both", expand=True)
 
-        input_frame = ttk.LabelFrame(main_frame, text="1. Wybierz folder główny z danymi gry", padding="10")
+        input_frame = ttk.LabelFrame(main_frame, text="1. Select the main folder with game data", padding="10")
         input_frame.pack(fill="x", pady=5)
         
         input_entry = ttk.Entry(input_frame, textvariable=self.input_dir_var, state="readonly", width=80)
         input_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        browse_input_btn = ttk.Button(input_frame, text="Przeglądaj...", command=self.select_input_dir)
+        browse_input_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_dir)
         browse_input_btn.pack(side="left")
 
-        output_frame = ttk.LabelFrame(main_frame, text="2. Wybierz plik wyjściowy (np. DIRINFO)", padding="10")
+        output_frame = ttk.LabelFrame(main_frame, text="2. Select the output file (e.g., DIRINFO)", padding="10")
         output_frame.pack(fill="x", pady=5)
         
         output_entry = ttk.Entry(output_frame, textvariable=self.output_file_var, state="readonly", width=80)
         output_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        browse_output_btn = ttk.Button(output_frame, text="Zapisz jako...", command=self.select_output_file)
+        browse_output_btn = ttk.Button(output_frame, text="Save As...", command=self.select_output_file)
         browse_output_btn.pack(side="left")
 
-        self.pack_button = ttk.Button(main_frame, text="Zbuduj Plik", command=self.pack_files, state="disabled")
+        self.pack_button = ttk.Button(main_frame, text="Build File", command=self.pack_files, state="disabled")
         self.pack_button.pack(pady=20, ipady=10, fill="x")
         
         log_frame = ttk.LabelFrame(main_frame, text="Log", padding="10")
@@ -61,23 +61,22 @@ class DD2Packer(tk.Tk):
             self.pack_button.config(state="disabled")
 
     def select_input_dir(self):
-        directory = filedialog.askdirectory(title="Wybierz folder główny")
+        directory = filedialog.askdirectory(title="Select Main Folder")
         if directory:
             self.input_dir_var.set(directory)
-            self._log(f"Wybrano folder wejściowy: {directory}")
+            self._log(f"Selected input folder: {directory}")
             self.check_paths()
 
     def select_output_file(self):
-        # --- ZMIANA W TEJ FUNKCJI ---
         filepath = filedialog.asksaveasfilename(
-            title="Zapisz plik archiwum jako",
-            defaultextension="",  # Nie dodawaj automatycznie żadnego rozszerzenia
-            initialfile="DIRINFO", # Domyślna nazwa pliku to DIRINFO
-            filetypes=[("Plik DIRINFO", "DIRINFO"), ("Wszystkie pliki", "*.*")]
+            title="Save Archive File As",
+            defaultextension="",
+            initialfile="DIRINFO",
+            filetypes=[("DIRINFO File", "DIRINFO"), ("All Files", "*.*")]
         )
         if filepath:
             self.output_file_var.set(filepath)
-            self._log(f"Wybrano plik wyjściowy: {filepath}")
+            self._log(f"Selected output file: {filepath}")
             self.check_paths()
 
     def pack_files(self):
@@ -90,7 +89,7 @@ class DD2Packer(tk.Tk):
         SECTOR_SIZE = 2048
         HEADER_END_OFFSET = 0xAA0
 
-        self._log("Krok 1: Wyszukiwanie i sortowanie plików...")
+        self._log("Step 1: Finding and sorting files...")
         all_files = []
         try:
             for root, dirs, files in os.walk(input_dir):
@@ -103,20 +102,20 @@ class DD2Packer(tk.Tk):
                     all_files.append((formatted_path, full_path))
             
             if not all_files:
-                messagebox.showerror("Błąd", f"Nie znaleziono żadnych plików w folderze:\n{input_dir}")
+                messagebox.showerror("Error", f"No files found in the folder:\n{input_dir}")
                 return
             
-            self._log(f"Znaleziono {len(all_files)} plików do spakowania.")
+            self._log(f"Found {len(all_files)} files to pack.")
         except Exception as e:
-            messagebox.showerror("Błąd", f"Błąd podczas odczytu folderu wejściowego: {e}")
+            messagebox.showerror("Error", f"Error while reading the input folder: {e}")
             return
 
-        self._log("Krok 2: Generowanie nagłówka i planu zapisu danych...")
+        self._log("Step 2: Generating header and data write plan...")
         header_data = bytearray()
         write_tasks = []
         
         current_sector = math.ceil(HEADER_END_OFFSET / SECTOR_SIZE)
-        self._log(f"Nagłówek kończy się na 0x{HEADER_END_OFFSET:X}. Pierwszy dostępny sektor: {current_sector}")
+        self._log(f"Header ends at 0x{HEADER_END_OFFSET:X}. First available sector: {current_sector}")
 
         for i, (formatted_path, full_path) in enumerate(all_files):
             block_number = i + 1
@@ -124,7 +123,7 @@ class DD2Packer(tk.Tk):
             try:
                 data_size = os.path.getsize(full_path)
             except Exception as e:
-                messagebox.showerror("Błąd", f"Nie można odczytać rozmiaru pliku {full_path}: {e}")
+                messagebox.showerror("Error", f"Cannot read the size of file {full_path}: {e}")
                 return
 
             if block_number in [1, 2]:
@@ -149,12 +148,12 @@ class DD2Packer(tk.Tk):
             write_offset = sector_index * SECTOR_SIZE
             write_tasks.append((write_offset, full_path))
             
-            self._log(f" - {formatted_path} -> Rozmiar: {data_size} B, Sektor: {sector_index} (Offset: 0x{write_offset:X})")
+            self._log(f" - {formatted_path} -> Size: {data_size} B, Sector: {sector_index} (Offset: 0x{write_offset:X})")
 
             sectors_needed = math.ceil(data_size / SECTOR_SIZE)
             current_sector += sectors_needed
 
-        self._log(f"Krok 3: Zapisywanie pliku {output_file}...")
+        self._log(f"Step 3: Writing the output file...")
         try:
             with open(output_file, 'wb') as f_out:
                 f_out.write(header_data)
@@ -168,11 +167,11 @@ class DD2Packer(tk.Tk):
                     with open(path, 'rb') as f_in:
                         f_out.write(f_in.read())
             
-            self._log("Gotowe! Plik archiwum został pomyślnie utworzony.")
-            messagebox.showinfo("Sukces", "Plik archiwum został pomyślnie utworzony!")
+            self._log("Done! The archive file was created successfully.")
+            messagebox.showinfo("Success", "The archive file was created successfully!")
 
         except Exception as e:
-            messagebox.showerror("Błąd zapisu", f"Nie udało się zapisać pliku wyjściowego:\n{e}")
+            messagebox.showerror("Write Error", f"Failed to write the output file:\n{e}")
 
 if __name__ == "__main__":
     app = DD2Packer()
