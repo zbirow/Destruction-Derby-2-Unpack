@@ -8,7 +8,7 @@ import re
 class SBKPacker(tk.Tk):
     def __init__(self):
         super().__init__()
-        self.title("SBK Sound Bank Packer")
+        self.title("SBK Sound Bank Packer (Corrected for Large Files)")
         self.geometry("750x500")
         self.resizable(False, False)
 
@@ -138,15 +138,18 @@ class SBKPacker(tk.Tk):
                 file_size = len(wav_content)
                 data_block.extend(wav_content)
 
-                address_to_write = current_absolute_offset
-                addr_low = address_to_write & 0xFFFF
-                addr_high = (address_to_write >> 16) & 0xFFFF
-                
-                entry_bytes = struct.pack('<HHHHHHHHHH',
-                    addr_low, addr_high, file_size, 0, duration_flag, 0, sample_rate, 0, 1, 0)
+                # --- CRITICAL FIX: Use 4-byte unsigned ints for all fields ---
+                # The format string '<5I' means: Little-endian, 5 Unsigned Integers
+                entry_bytes = struct.pack('<5I',
+                    current_absolute_offset, # Address (4 bytes)
+                    file_size,               # Size (4 bytes)
+                    duration_flag,           # Duration flag (4 bytes)
+                    sample_rate,             # Sample rate (4 bytes)
+                    1                        # Unknown flag (4 bytes, default to 1)
+                )
                 index_entries_data.append(entry_bytes)
                 
-                self._log(f" - {os.path.basename(path)} -> Offset: 0x{address_to_write:X}, Duration: {duration_seconds:.3f}s, Duration Flag: {duration_flag}")
+                self._log(f" - {os.path.basename(path)} -> Offset: 0x{current_absolute_offset:X}, Size: {file_size} B")
                 
                 current_absolute_offset += file_size
                 
@@ -177,7 +180,7 @@ class SBKPacker(tk.Tk):
                 f_out.write(header)
                 for entry_data in index_entries_data:
                     f_out.write(entry_data)
-                    f_out.write(b'\x00' * 8)
+                    f_out.write(b'\x00' * 8) # 8 bytes of padding after each 20-byte entry
                 f_out.write(data_block)
             self._log("Done! The archive file was created successfully.")
             messagebox.showinfo("Success", "The archive file was created successfully!")
