@@ -45,7 +45,21 @@ This tool packs multiple `.wav` files from a folder into a single `.sbk` sound b
 
 ---
 
-## 3. Destruction Derby 2 DIRINFO Unpacker (`Dirinfo_Unpacker.py`)
+## 3. SBK Archive Editor (`Bank1_Viewer.py.py`)
+
+This is the primary tool for working with `.sbk` archives. It functions as an archive viewer, editor, and extractor. It properly reads the file's header and index table, allowing you to modify metadata and save the changes.
+
+### How to Use
+1.  Run the script: `python Bank1_Viewer.py.py`
+2.  In the application window, go to `File -> Open Archive...` and select your `.sbk` file.
+3.  The table will populate with the contents of the archive, showing detailed information for each sound.
+4.  **To edit an entry:** Double-click on a row in the list. A new window will appear, allowing you to change the `Sample Rate`, `Duration Flag`, and `Unknown Flag`. Click "OK" to confirm.
+5.  **To save your changes:** Go to `File -> Save As...`. This will create a new, modified `.sbk` archive, leaving your original file untouched. A `*` in the window title indicates unsaved changes.
+6.  **To extract a sound:** Click on a row to select it, then go to `File -> Extract Selected Sound...`.
+
+---
+
+## 4. Destruction Derby 2 DIRINFO Unpacker (`Dirinfo_Unpacker.py`)
 
 This tool unpacks all files from a Destruction Derby 2 `DIRINFO` archive, reading the header to determine file names, offsets, and sizes, and recreating the original directory structure.
 
@@ -58,7 +72,7 @@ This tool unpacks all files from a Destruction Derby 2 `DIRINFO` archive, readin
 
 ---
 
-## 4. Destruction Derby 2 DIRINFO Packer (`Dirinfo_Packer.py`)
+## 5. Destruction Derby 2 DIRINFO Packer (`Dirinfo_Packer.py`)
 
 This tool packs a folder structure (containing subfolders and files) into a single `DIRINFO` archive compatible with Destruction Derby 2. It automatically calculates sector offsets and builds the complex header.
 
@@ -69,3 +83,7 @@ This tool packs a folder structure (containing subfolders and files) into a sing
 2.  Select the **root input folder** that contains your game data (e.g., a folder containing the `LEV0`, `LEV1`, etc. subdirectories).
 3.  Select the output file path and name (e.g., `DIRINFO`).
 4.  Click the **"Build File"** button.
+
+---
+
+
