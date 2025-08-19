@@ -8,7 +8,7 @@ class DD2Unpacker(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Destruction Derby 2 - DIRINFO Unpacker")
-        self.geometry("700x500")
+        self.geometry("750x500")
         self.resizable(False, False)
 
         self.input_file_var = tk.StringVar()
@@ -20,31 +20,27 @@ class DD2Unpacker(tk.Tk):
         main_frame = ttk.Frame(self, padding="10")
         main_frame.pack(fill="both", expand=True)
 
-        # --- Sekcja Wejścia ---
-        input_frame = ttk.LabelFrame(main_frame, text="1. Wybierz plik DIRINFO", padding="10")
+        input_frame = ttk.LabelFrame(main_frame, text="1. Select DIRINFO file", padding="10")
         input_frame.pack(fill="x", pady=5)
         
         input_entry = ttk.Entry(input_frame, textvariable=self.input_file_var, state="readonly", width=80)
         input_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        browse_input_btn = ttk.Button(input_frame, text="Przeglądaj...", command=self.select_input_file)
+        browse_input_btn = ttk.Button(input_frame, text="Browse...", command=self.select_input_file)
         browse_input_btn.pack(side="left")
 
-        # --- Sekcja Wyjścia ---
-        output_frame = ttk.LabelFrame(main_frame, text="2. Wybierz folder docelowy", padding="10")
+        output_frame = ttk.LabelFrame(main_frame, text="2. Select destination folder", padding="10")
         output_frame.pack(fill="x", pady=5)
         
         output_entry = ttk.Entry(output_frame, textvariable=self.output_dir_var, state="readonly", width=80)
         output_entry.pack(side="left", fill="x", expand=True, padx=(0, 5))
         
-        browse_output_btn = ttk.Button(output_frame, text="Przeglądaj...", command=self.select_output_dir)
+        browse_output_btn = ttk.Button(output_frame, text="Browse...", command=self.select_output_dir)
         browse_output_btn.pack(side="left")
 
-        # --- Przycisk Wypakowania ---
-        self.unpack_button = ttk.Button(main_frame, text="Wypakuj Pliki", command=self.unpack_files, state="disabled")
+        self.unpack_button = ttk.Button(main_frame, text="Unpack Files", command=self.unpack_files, state="disabled")
         self.unpack_button.pack(pady=20, ipady=10, fill="x")
         
-        # --- Logi ---
         log_frame = ttk.LabelFrame(main_frame, text="Log", padding="10")
         log_frame.pack(fill="both", expand=True, pady=5)
         
@@ -66,19 +62,19 @@ class DD2Unpacker(tk.Tk):
 
     def select_input_file(self):
         filepath = filedialog.askopenfilename(
-            title="Wybierz plik DIRINFO",
-            filetypes=[("Plik DIRINFO", "DIRINFO"), ("Wszystkie pliki", "*.*")]
+            title="Select DIRINFO File",
+            filetypes=[("DIRINFO File", "DIRINFO"), ("All Files", "*.*")]
         )
         if filepath:
             self.input_file_var.set(filepath)
-            self._log(f"Wybrano plik wejściowy: {filepath}")
+            self._log(f"Selected input file: {filepath}")
             self.check_paths()
 
     def select_output_dir(self):
-        directory = filedialog.askdirectory(title="Wybierz folder docelowy")
+        directory = filedialog.askdirectory(title="Select Destination Folder")
         if directory:
             self.output_dir_var.set(directory)
-            self._log(f"Wybrano folder wyjściowy: {directory}")
+            self._log(f"Selected output folder: {directory}")
             self.check_paths()
 
     def unpack_files(self):
@@ -97,10 +93,9 @@ class DD2Unpacker(tk.Tk):
                     if len(block) < 24:
                         break
 
-                    # Logika z Twojego oryginalnego skryptu
                     if block_count < 2:
                         name_length, padding_size = 17, 1
-                    elif block_count == 11: # 12-ty blok (indeksowany od 0)
+                    elif block_count == 11: # 12th block (0-indexed)
                         name_length, padding_size = 16, 2
                     else:
                         name_length, padding_size = 14, 4
@@ -125,28 +120,27 @@ class DD2Unpacker(tk.Tk):
                         data = f.read(size)
                         f.seek(current_pos)
 
-                        # Utwórz pełną ścieżkę docelową
                         output_path = output_dir / name
                         output_path.parent.mkdir(parents=True, exist_ok=True)
 
                         with open(output_path, 'wb') as out:
                             out.write(data)
 
-                        log_msg = f"Wypakowano: {name.ljust(30)} (blok: {block_count:2d}, sektor: {index:5d}, rozmiar: {size:8d} B, offset: 0x{data_offset:06X})"
+                        log_msg = f"Unpacked: {name.ljust(30)} (block: {block_count:2d}, sector: {index:5d}, size: {size:8d} B, offset: 0x{data_offset:06X})"
                         self._log(log_msg)
                     else:
-                        log_msg = f"Pominięto:  {name.ljust(30)} (blok: {block_count:2d}, błędny sektor lub rozmiar)"
+                        log_msg = f"Skipped:  {name.ljust(30)} (block: {block_count:2d}, invalid sector or size)"
                         self._log(log_msg)
 
                     block_count += 1
             
-            self._log(f"\nZakończono! Pliki zapisano w: {output_dir}")
-            messagebox.showinfo("Sukces", "Wszystkie pliki zostały pomyślnie wypakowane!")
+            self._log(f"\nComplete! Files saved to: {output_dir}")
+            messagebox.showinfo("Success", "All files have been successfully unpacked!")
 
         except FileNotFoundError:
-            messagebox.showerror("Błąd", f"Nie można znaleźć pliku wejściowego:\n{input_file}")
+            messagebox.showerror("Error", f"Could not find the input file:\n{input_file}")
         except Exception as e:
-            messagebox.showerror("Błąd krytyczny", f"Wystąpił nieoczekiwany błąd podczas wypakowywania:\n{e}")
+            messagebox.showerror("Critical Error", f"An unexpected error occurred during unpacking:\n{e}")
 
 if __name__ == "__main__":
     app = DD2Unpacker()
