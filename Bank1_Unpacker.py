@@ -2,6 +2,7 @@ import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import os
 import struct
+import json
 from pathlib import Path
 
 class SBKUnpacker(tk.Tk):
@@ -10,7 +11,7 @@ class SBKUnpacker(tk.Tk):
         self.title("SBK Sound Bank Unpacker (Index-Based)")
         self.geometry("750x500")
         self.resizable(False, False)
-
+        
         self.input_file_var = tk.StringVar()
         self.output_dir_var = tk.StringVar()
 
@@ -107,6 +108,9 @@ class SBKUnpacker(tk.Tk):
             index_data_size = 20
             extracted_count = 0
 
+            # Przygotuj słownik na konfigurację
+            config_data = {}
+
             for i in range(file_count):
                 entry_offset = index_start_offset + (i * index_entry_stride)
                 entry_data = archive_data[entry_offset : entry_offset + index_data_size]
@@ -115,6 +119,8 @@ class SBKUnpacker(tk.Tk):
                 parts = struct.unpack('<5I', entry_data)
                 absolute_offset = parts[0]
                 block_size = parts[1]
+                duration_flag = parts[2]   # Odczytaj flagę
+                sample_rate = parts[3]     # Odczytaj częstotliwość próbkowania
                 
                 # Sanity checks
                 if block_size == 0:
@@ -135,7 +141,23 @@ class SBKUnpacker(tk.Tk):
                 with open(output_path, 'wb') as f_out:
                     f_out.write(sound_data)
 
-                self._log(f" -> Extracted '{output_filename}' (Size: {block_size} B, Offset: 0x{absolute_offset:X})")
+                # Zapisz metadane do słownika konfiguracyjnego
+                config_data[output_filename] = {
+                    'duration_flag': int(duration_flag),
+                    'sample_rate': int(sample_rate),
+                    'unknown_flag': int(parts[4])  # Ostatnia flaga (domyślnie 1)
+                }
+
+                self._log(f" -> Extracted '{output_filename}' (Size: {block_size} B, Offset: 0x{absolute_offset:X}, Flag: {duration_flag}, Hz: {sample_rate})")
+
+            # Zapisz konfigurację do pliku JSON
+            config_path = os.path.join(output_dir, "config.json")
+            try:
+                with open(config_path, 'w', encoding='utf-8') as config_file:
+                    json.dump(config_data, config_file, indent=4, ensure_ascii=False)
+                self._log(f"\n  Konfiguracja zapisana do: {config_path}")
+            except Exception as e:
+                self._log(f"\n  ! Uwaga: Nie udało się zapisać pliku konfiguracyjnego: {e}")
 
             self._log(f"\nDone! Extracted a total of {extracted_count} files.")
             messagebox.showinfo("Success", f"Extraction complete! {extracted_count} files were saved.")
