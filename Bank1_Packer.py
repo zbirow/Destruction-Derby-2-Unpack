@@ -4,6 +4,7 @@ import os
 import struct
 import wave
 import re
+import json
 
 class SBKPacker(tk.Tk):
     def __init__(self):
@@ -11,7 +12,7 @@ class SBKPacker(tk.Tk):
         self.title("SBK Sound Bank Packer (Corrected for Large Files)")
         self.geometry("750x500")
         self.resizable(False, False)
-
+        
         self.input_dir_var = tk.StringVar()
         self.output_file_var = tk.StringVar()
 
@@ -80,6 +81,32 @@ class SBKPacker(tk.Tk):
             self._log(f"Selected output file: {filepath}")
             self.check_paths()
 
+    def _read_config(self, config_path, file_basename):
+        """
+        Wczytuje konfigurację dla konkretnego pliku z JSON-a.
+        Zwraca słownik z kluczami 'sample_rate' i 'duration_flag'.
+        Jeśli pliku nie ma lub brakuje wartości, zwraca None.
+        """
+        try:
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config_data = json.load(f)
+                
+                # Szukaj sekcji dla konkretnego pliku (np. "sound_001.wav")
+                file_entry = config_data.get(file_basename)
+                if file_entry:
+                    # Konwertuj typy, aby były zgodne z kodem pakowania
+                    sr = int(file_entry.get('sample_rate', 0))
+                    df = int(file_entry.get('duration_flag', 0))
+                    # Prosta walidacja: sample_rate musi być dodatni
+                    if sr > 0:
+                        return {'sample_rate': sr, 'duration_flag': df}
+                    else:
+                        self._log(f"  ! Nieprawidłowy sample_rate w config dla {file_basename}. Używam obliczonej wartości.")
+        except Exception as e:
+            self._log(f"  ! Błąd odczytu config.json dla {file_basename}: {e}. Używam obliczonej wartości.")
+        return None
+
     def pack_files(self):
         input_dir = self.input_dir_var.get()
         output_file = self.output_file_var.get()
@@ -120,20 +147,44 @@ class SBKPacker(tk.Tk):
         
         current_absolute_offset = data_block_start_offset
 
+        # Sprawdź, czy istnieje config.json w folderze wejściowym
+        config_path = os.path.join(input_dir, "config.json")
+        config_exists = os.path.exists(config_path)
+        if config_exists:
+            self._log("  Plik config.json znaleziony. Próbuję użyć konfiguracji z niego.")
+        else:
+            self._log("  Plik config.json nie znaleziony. Obliczam wartości (sample_rate, duration_flag) z plików .wav.")
+
         for num, path in files_to_pack:
+            file_basename = os.path.basename(path)
+            config_for_file = None
+            sample_rate = 0
+            duration_flag = 0
+
             try:
+                # Próba odczytu konfiguracji z pliku JSON
+                if config_exists:
+                    config_for_file = self._read_config(config_path, file_basename)
+
                 with open(path, 'rb') as f_wav:
                     wav_content = f_wav.read()
                 
-                with wave.open(path, 'rb') as wav_obj:
-                    sample_rate = wav_obj.getframerate()
-                    num_frames = wav_obj.getnframes()
-                    
-                    duration_seconds = 0
-                    if sample_rate > 0:
-                        duration_seconds = num_frames / float(sample_rate)
-                    
-                    duration_flag = 1 if duration_seconds >= 1.0 else 0
+                # Jeśli nie ma konfiguracji w JSON, oblicz wartości z pliku WAV
+                if config_for_file is None:
+                    with wave.open(path, 'rb') as wav_obj:
+                        sample_rate = wav_obj.getframerate()
+                        num_frames = wav_obj.getnframes()
+                        
+                        duration_seconds = 0
+                        if sample_rate > 0:
+                            duration_seconds = num_frames / float(sample_rate)
+                        
+                        duration_flag = 1 if duration_seconds >= 1.0 else 0
+                else:
+                    # Użyj wartości z config.json
+                    sample_rate = config_for_file['sample_rate']
+                    duration_flag = config_for_file['duration_flag']
+                    self._log(f"    [Użyto config.json]")
 
                 file_size = len(wav_content)
                 data_block.extend(wav_content)
@@ -149,7 +200,8 @@ class SBKPacker(tk.Tk):
                 )
                 index_entries_data.append(entry_bytes)
                 
-                self._log(f" - {os.path.basename(path)} -> Offset: 0x{current_absolute_offset:X}, Size: {file_size} B, Duration Flag: {duration_flag}")
+                source_info = f"config" if config_for_file else "WAV"
+                self._log(f" - {os.path.basename(path)} -> Offset: 0x{current_absolute_offset:X}, Size: {file_size} B, Flag: {duration_flag}, Hz: {sample_rate} [{source_info}]")
                 
                 current_absolute_offset += file_size
                 
